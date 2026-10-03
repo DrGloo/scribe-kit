@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "engineering-scribe"
 version = "1.0.0"
-description = "A factual, idempotent Discord engineering journal for Git pushes"
+description = "Turn accepted Git pushes into factual, idempotent Discord engineering updates"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
