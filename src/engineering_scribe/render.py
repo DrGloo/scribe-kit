@@ -31,7 +31,7 @@ class DiscordEmbedRenderer:
             "username": "The Scribe",
             "embeds": [
                 {
-                    "title": f"🛠️ Development Update — {digest.title}"[:256],
+                    "title": "🛠️ Development Update — The Scribe",
                     "description": description,
                     "color": 5_793_266,
                 }
