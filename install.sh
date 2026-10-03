@@ -22,6 +22,10 @@ chmod +x "$TARGET/.githooks/scribe-pre-push"
 append_ignore() {
 	local pattern="$1"
 	touch "$TARGET/.gitignore"
+	# Ensure the file ends with a newline before appending.
+	if [ -s "$TARGET/.gitignore" ] && [ "$(tail -c 1 "$TARGET/.gitignore" | wc -l)" -eq 0 ]; then
+		printf '\n' >>"$TARGET/.gitignore"
+	fi
 	grep -Fxq "$pattern" "$TARGET/.gitignore" || printf '%s\n' "$pattern" >>"$TARGET/.gitignore"
 }
 
