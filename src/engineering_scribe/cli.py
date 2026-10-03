@@ -21,14 +21,14 @@ class ScribeCli:
         if os.getenv("SCRIBE_SKIP") == "1" or os.getenv("SCRIBE_ENABLED") == "0":
             print("[scribe] disabled")
             return 0
-        config = ScribeConfig.from_environment(repository_path, options.preview)
-        coordinator = ScribeCoordinator(GitRepository(repository_path), config)
         try:
+            config = ScribeConfig.from_environment(repository_path, options.preview)
+            coordinator = ScribeCoordinator(GitRepository(repository_path), config)
             outcome = coordinator.report(options.revision_range, options.branch)
         except (GitCommandError, PublishError, ValueError) as error:
             print(f"[scribe] error: {error}", file=sys.stderr)
             return 1
-        print(f"[scribe] {outcome}: {options.branch} {options.revision_range}")
+        print(f"[scribe] {outcome.value}: {options.branch} {options.revision_range}")
         return 0
 
     @staticmethod

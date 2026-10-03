@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -29,9 +29,15 @@ class ChangeSet:
     additions: int = 0
     deletions: int = 0
 
+    SHORT_SHA_LENGTH = 7
+
     @property
     def event_id(self) -> str:
         return f"{self.branch}@{self.after}"
+
+    @property
+    def short_after_sha(self) -> str:
+        return self.after[: self.SHORT_SHA_LENGTH]
 
 
 @dataclass(frozen=True)
@@ -39,9 +45,7 @@ class Digest:
     title: str
     developers: tuple[str, ...]
     categories: tuple[str, ...]
-    changed: str
+    change_summary: str
     achieved: str
     technical_changes: tuple[str, ...]
     impact: str
-    confidence: str = "low"
-    metadata: dict[str, str] = field(default_factory=dict)

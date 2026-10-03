@@ -9,6 +9,7 @@ from .models import ChangeSet, Digest
 
 class DiscordEmbedRenderer:
     DESCRIPTION_LIMIT = 4096
+    EMBED_COLOR = 5_793_266
 
     def render(
         self,
@@ -21,7 +22,7 @@ class DiscordEmbedRenderer:
         sections = [
             f"**Developer**\n{', '.join(digest.developers)}",
             f"**Category**\n{', '.join(digest.categories)}",
-            f"**What Changed**\n{digest.changed}",
+            f"**What Changed**\n{digest.change_summary}",
             f"**What Was Achieved**\n{digest.achieved}",
             f"**Technical Changes**\n{technical or 'No file changes listed.'}",
             f"**Impact**\n{digest.impact}",
@@ -33,7 +34,7 @@ class DiscordEmbedRenderer:
                 {
                     "title": "🛠️ Development Update — The Scribe",
                     "description": description,
-                    "color": 5_793_266,
+                    "color": self.EMBED_COLOR,
                 }
             ],
         }
@@ -48,8 +49,12 @@ class DiscordEmbedRenderer:
 
     @staticmethod
     def _footer(change_set: ChangeSet, commit_url: str | None) -> str:
-        short_sha = change_set.after[:7]
-        commit = f"[`{short_sha}`]({commit_url})" if commit_url else f"`{short_sha}`"
+        abbreviated_sha = change_set.short_after_sha
+        commit = (
+            f"[`{abbreviated_sha}`]({commit_url})"
+            if commit_url
+            else f"`{abbreviated_sha}`"
+        )
         link = f"\n\n[🔗 View Commit]({commit_url})" if commit_url else ""
         return (
             f"**Commit**\n{commit}\n"

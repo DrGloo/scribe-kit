@@ -6,7 +6,11 @@ from pathlib import Path
 
 
 class EventLedger:
-    def __init__(self, cache_dir: Path, maximum_entries: int = 5000) -> None:
+    DEFAULT_MAXIMUM_ENTRIES = 5000
+
+    def __init__(
+        self, cache_dir: Path, maximum_entries: int = DEFAULT_MAXIMUM_ENTRIES
+    ) -> None:
         self.cache_dir = cache_dir
         self.maximum_entries = maximum_entries
         self.path = cache_dir / "posted.log"
@@ -14,7 +18,10 @@ class EventLedger:
     def contains(self, event_id: str) -> bool:
         if not self.path.is_file():
             return False
-        return event_id in set(self.path.read_text(encoding="utf-8").splitlines())
+        return any(
+            line == event_id
+            for line in self.path.read_text(encoding="utf-8").splitlines()
+        )
 
     def mark(self, event_id: str) -> None:
         self.cache_dir.mkdir(parents=True, exist_ok=True)

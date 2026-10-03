@@ -13,6 +13,8 @@ class GitCommandError(RuntimeError):
 
 
 class GitRepository:
+    COMMAND_TIMEOUT_SECONDS = 30
+
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
 
@@ -27,7 +29,7 @@ class GitRepository:
             revision_range,
         )
         commits = tuple(self._parse_commit(line) for line in commit_lines.splitlines())
-        files = tuple(self._collect_files(revision_range))
+        files = self._collect_files(revision_range)
         additions, deletions = self._collect_diff_stats(revision_range)
         return ChangeSet(
             branch=branch,
@@ -51,17 +53,17 @@ class GitRepository:
             return f"{remote}/commit/{sha}"
         return None
 
-    def _collect_files(self, revision_range: str) -> list[FileChange]:
+    def _collect_files(self, revision_range: str) -> tuple[FileChange, ...]:
         output = self._git("diff", "--name-status", "--find-renames", revision_range)
         changes: list[FileChange] = []
         for line in output.splitlines():
             parts = line.split("\t")
             status = parts[0][0]
-            if status == "R" and len(parts) >= 3:
+            if status in {"R", "C"} and len(parts) >= 3:
                 changes.append(FileChange(status, parts[2], parts[1]))
             elif len(parts) >= 2:
                 changes.append(FileChange(status, parts[1]))
-        return changes
+        return tuple(changes)
 
     def _collect_diff_stats(self, revision_range: str) -> tuple[int, int]:
         output = self._git("diff", "--numstat", revision_range)
@@ -84,17 +86,26 @@ class GitRepository:
 
     @staticmethod
     def _parse_commit(line: str) -> Commit:
-        sha, author, subject = line.split("\t", 2)
+        parts = line.split("\t", 2)
+        if len(parts) != 3:
+            raise GitCommandError(f"malformed commit line: {line!r}")
+        sha, author, subject = parts
         return Commit(sha, author, subject)
 
     def _git(self, *arguments: str) -> str:
-        process = subprocess.run(
-            ["git", *arguments],
-            cwd=self.root,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            process = subprocess.run(
+                ["git", *arguments],
+                cwd=self.root,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=self.COMMAND_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise GitCommandError(
+                f"git command timed out after {self.COMMAND_TIMEOUT_SECONDS}s"
+            ) from error
         if process.returncode:
             raise GitCommandError(process.stderr.strip() or "git command failed")
         return process.stdout.strip()

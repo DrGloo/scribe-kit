@@ -18,6 +18,7 @@ class DotEnvLoader:
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, value = line.split("=", 1)
+            key = key.strip()
             if not key.startswith("SCRIBE_") or not key.replace("_", "").isalnum():
                 continue
             value = value.strip()
@@ -37,8 +38,10 @@ class ScribeConfig:
     preview: bool
 
     @classmethod
-    def from_environment(cls, repository: Path, preview: bool = False) -> "ScribeConfig":
-        DotEnvLoader().load(repository / ".env")
+    def from_environment(
+        cls, repository_path: Path, preview: bool = False
+    ) -> "ScribeConfig":
+        DotEnvLoader().load(repository_path / ".env")
         return cls(
             webhook_url=os.getenv("SCRIBE_DISCORD_WEBHOOK_URL") or None,
             connect_timeout=float(os.getenv("SCRIBE_DISCORD_CONNECT_TIMEOUT", "10")),
@@ -46,7 +49,7 @@ class ScribeConfig:
             retries=max(1, int(os.getenv("SCRIBE_DISCORD_RETRIES", "3"))),
             retry_after_cap=float(os.getenv("SCRIBE_DISCORD_MAX_RETRY_AFTER", "30")),
             cache_dir=Path(
-                os.getenv("SCRIBE_CACHE_DIR", repository / ".git" / "scribe-cache")
+                os.getenv("SCRIBE_CACHE_DIR", repository_path / ".git" / "scribe-cache")
             ),
             preview=preview or os.getenv("SCRIBE_PREVIEW") == "1",
         )

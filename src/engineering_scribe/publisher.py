@@ -15,6 +15,8 @@ class PublishError(RuntimeError):
 
 
 class DiscordPublisher:
+    DEFAULT_RETRY_AFTER_SECONDS = 2.0
+
     def __init__(self, config: ScribeConfig) -> None:
         self.config = config
 
@@ -31,12 +33,13 @@ class DiscordPublisher:
                 return
             except urllib.error.HTTPError as error:
                 last_error = error
-                if error.code == 429:
-                    self._wait_for_rate_limit(error, attempt)
-                elif error.code >= 500:
-                    self._wait_for_retry(attempt)
-                else:
-                    raise PublishError(f"Discord returned HTTP {error.code}") from error
+                with error:
+                    if error.code == 429:
+                        self._wait_for_rate_limit(error, attempt)
+                    elif error.code >= 500:
+                        self._wait_for_retry(attempt)
+                    else:
+                        raise PublishError(f"Discord returned HTTP {error.code}") from error
             except (urllib.error.URLError, TimeoutError) as error:
                 last_error = error
                 self._wait_for_retry(attempt)
@@ -52,13 +55,16 @@ class DiscordPublisher:
         )
         timeout = max(self.config.connect_timeout, self.config.request_timeout)
         with urllib.request.urlopen(request, timeout=timeout) as response:
+            response.read()
             if response.status not in (200, 201, 204):
                 raise PublishError(f"Discord returned HTTP {response.status}")
 
     def _wait_for_rate_limit(
         self, error: urllib.error.HTTPError, attempt: int
     ) -> None:
-        retry_after = 2.0
+        if attempt + 1 >= self.config.retries:
+            return
+        retry_after = self.DEFAULT_RETRY_AFTER_SECONDS
         try:
             body = json.loads(error.read().decode("utf-8"))
             retry_after = float(body.get("retry_after", retry_after))

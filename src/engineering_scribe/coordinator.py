@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from enum import Enum
 
 from .config import ScribeConfig
 from .digest import FactualDigestBuilder, NoisePolicy
@@ -10,6 +11,13 @@ from .ledger import EventLedger
 from .publisher import DiscordPublisher
 from .render import DiscordEmbedRenderer
 from .repository import GitRepository
+
+
+class ReportOutcome(str, Enum):
+    SUPPRESSED = "suppressed"
+    DUPLICATE = "duplicate"
+    PREVIEWED = "previewed"
+    POSTED = "posted"
 
 
 class ScribeCoordinator:
@@ -27,14 +35,14 @@ class ScribeCoordinator:
         self.publisher = DiscordPublisher(config)
         self.ledger = EventLedger(config.cache_dir)
 
-    def report(self, revision_range: str, branch: str) -> str:
+    def report(self, revision_range: str, branch: str) -> ReportOutcome:
         change_set = self.repository.collect(revision_range, branch)
-        substantive = self.noise_policy.substantive(change_set.files)
+        substantive = self.noise_policy.filter_substantive(change_set.files)
         if not change_set.commits or not substantive:
-            return "suppressed"
+            return ReportOutcome.SUPPRESSED
         change_set = replace(change_set, files=substantive)
         if self.ledger.contains(change_set.event_id):
-            return "duplicate"
+            return ReportOutcome.DUPLICATE
         digest = self.digest_builder.build(change_set)
         payload = self.renderer.render(
             digest,
@@ -44,4 +52,4 @@ class ScribeCoordinator:
         self.publisher.publish(payload)
         if not self.config.preview:
             self.ledger.mark(change_set.event_id)
-        return "previewed" if self.config.preview else "posted"
+        return ReportOutcome.PREVIEWED if self.config.preview else ReportOutcome.POSTED
