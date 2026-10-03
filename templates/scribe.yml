@@ -1,0 +1,56 @@
+name: The Scribe
+
+on:
+  push:
+    branches:
+      - "**"
+    tags-ignore:
+      - "**"
+
+concurrency:
+  group: scribe-${{ github.repository }}-${{ github.ref }}-${{ github.event.after }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Discord development update
+    runs-on: ubuntu-latest
+    if: github.event.after != '0000000000000000000000000000000000000000'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore idempotency ledger
+        uses: actions/cache@v4
+        with:
+          path: .scribe-ci-cache
+          key: scribe-v1-${{ github.repository }}-${{ github.event.after }}
+          restore-keys: |
+            scribe-v1-${{ github.repository }}-
+
+      - name: Publish factual push digest
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.scribe
+          SCRIBE_CACHE_DIR: ${{ github.workspace }}/.scribe-ci-cache
+          SCRIBE_DISCORD_WEBHOOK_URL: ${{ secrets.SCRIBE_DISCORD_WEBHOOK_URL }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -eu
+          ZERO=0000000000000000000000000000000000000000
+          if [ -z "${SCRIBE_DISCORD_WEBHOOK_URL:-}" ]; then
+            echo "::error::Repository secret SCRIBE_DISCORD_WEBHOOK_URL is missing"
+            exit 1
+          fi
+          if [ "$BEFORE" = "$ZERO" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            BEFORE="$(git rev-list --max-parents=0 "$AFTER" | tail -n 1)"
+          fi
+          if [ "$BEFORE" = "$AFTER" ]; then
+            echo "[scribe] first commit has no prior range; skipping"
+            exit 0
+          fi
+          python3 -m engineering_scribe.cli \
+            --range "${BEFORE}..${AFTER}" \
+            --branch "$BRANCH"

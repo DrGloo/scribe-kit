@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Local preview only. GitHub Actions owns Discord publication.
+set -u
+
+ROOT="$(git rev-parse --show-toplevel)"
+ZERO=0000000000000000000000000000000000000000
+PYTHONPATH="$ROOT/.scribe${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+	[ "$local_sha" != "$ZERO" ] || continue
+	case "$local_ref" in refs/heads/*) ;; *) continue ;; esac
+	branch="${local_ref#refs/heads/}"
+	if [ "$remote_sha" = "$ZERO" ]; then
+		base="$(git merge-base origin/main "$local_sha" 2>/dev/null || true)"
+		if [ -z "$base" ]; then
+			base="$(git rev-list --max-parents=0 "$local_sha" | tail -n 1)"
+		fi
+	else
+		base="$remote_sha"
+	fi
+	[ -n "$base" ] && [ "$base" != "$local_sha" ] || continue
+	python3 -m engineering_scribe.cli \
+		--preview \
+		--range "${base}..${local_sha}" \
+		--branch "$branch" || true
+done
